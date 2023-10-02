@@ -805,7 +805,8 @@ pub fn session_start_(
         if !is_pre_added {
             let session = session.clone();
             std::thread::spawn(move || {
-                io_loop(session);
+                let round = session.connection_round_state.lock().unwrap().new_round();
+                io_loop(session, round);
             });
         }
         Ok(())
@@ -906,6 +907,10 @@ pub mod connection_manager {
         fn update_voice_call_state(&self, client: &crate::ui_cm_interface::Client) {
             let client_json = serde_json::to_string(&client).unwrap_or("".into());
             self.push_event("update_voice_call_state", vec![("client", &client_json)]);
+        }
+
+        fn file_transfer_log(&self, log: String) {
+            self.push_event("cm_file_transfer_log", vec![("log", &log.to_string())]);
         }
     }
 
@@ -1074,7 +1079,8 @@ pub fn session_next_rgba(session_id: SessionID) {
 pub fn session_register_texture(_session_id: SessionID, _ptr: usize) {
     #[cfg(feature = "flutter_texture_render")]
     if let Some(session) = SESSIONS.write().unwrap().get_mut(&_session_id) {
-        return session.register_texture(_ptr);
+        session.register_texture(_ptr);
+        return;
     }
 }
 

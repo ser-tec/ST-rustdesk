@@ -627,8 +627,8 @@ pub fn toggle_blank_screen(_v: bool) {
     // https://unix.stackexchange.com/questions/17170/disable-keyboard-mouse-input-on-unix-under-x
 }
 
-pub fn block_input(_v: bool) -> bool {
-    true
+pub fn block_input(_v: bool) -> (bool, String) {
+    (true, "".to_owned())
 }
 
 pub fn is_installed() -> bool {
@@ -1074,7 +1074,7 @@ mod desktop {
 
         pub fn refresh(&mut self) {
             if !self.sid.is_empty() && is_active_and_seat0(&self.sid) {
-                     return;
+                return;
             }
 
             let seat0_values = get_values_of_seat0(&[0, 1, 2]);
@@ -1088,7 +1088,7 @@ mod desktop {
             self.uid = seat0_values[1].clone();
             self.username = seat0_values[2].clone();
             self.protocal = get_display_server_of_session(&self.sid).into();
-            if self.is_login_wayland() {
+            if self.is_wayland() {
                 self.display = "".to_owned();
                 self.xauth = "".to_owned();
                 self.is_rustdesk_subprocess = false;
@@ -1183,6 +1183,7 @@ pub fn uninstall_service(show_new_window: bool) -> bool {
 }
 
 pub fn install_service() -> bool {
+    let _installing = crate::platform::InstallingService::new();
     if !has_cmd("systemctl") {
         return false;
     }

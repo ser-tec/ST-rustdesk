@@ -11,6 +11,7 @@ import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/generated_bridge.dart';
 import 'package:flutter_hbb/models/ab_model.dart';
 import 'package:flutter_hbb/models/chat_model.dart';
+import 'package:flutter_hbb/models/cm_file_model.dart';
 import 'package:flutter_hbb/models/file_model.dart';
 import 'package:flutter_hbb/models/group_model.dart';
 import 'package:flutter_hbb/models/peer_tab_model.dart';
@@ -201,11 +202,11 @@ class FfiModel with ChangeNotifier {
     }, sessionId, peerId);
     updatePrivacyMode(data.updatePrivacyMode, sessionId, peerId);
     setConnectionType(peerId, data.secure, data.direct);
-    handlePeerInfo(data.peerInfo, peerId);
+    await handlePeerInfo(data.peerInfo, peerId);
     for (var element in data.cursorDataList) {
-      handleCursorData(element);
+      await handleCursorData(element);
     }
-    handleCursorId(data.lastCursorId);
+    await handleCursorId(data.lastCursorId);
   }
 
   // todo: why called by two position
@@ -264,8 +265,6 @@ class FfiModel with ChangeNotifier {
         updateBlockInputState(evt, peerId);
       } else if (name == 'update_privacy_mode') {
         updatePrivacyMode(evt, sessionId, peerId);
-      } else if (name == 'alias') {
-        handleAliasChanged(evt);
       } else if (name == 'show_elevation') {
         final show = evt['show'].toString() == 'true';
         parent.target?.serverModel.setShowElevation(show);
@@ -317,6 +316,10 @@ class FfiModel with ChangeNotifier {
             }
           }
         }
+      } else if (name == "cm_file_transfer_log") {
+        if (isDesktop) {
+          gFFI.cmFileModel.onFileTransferLog(evt['log']);
+        }
       } else {
         debugPrint('Unknown event name: $name');
       }
@@ -345,13 +348,6 @@ class FfiModel with ChangeNotifier {
   /// Bind the event listener to receive events from the Rust core.
   updateEventListener(SessionID sessionId, String peerId) {
     platformFFI.setEventCallback(startEventListener(sessionId, peerId));
-  }
-
-  handleAliasChanged(Map<String, dynamic> evt) {
-    final rxAlias = PeerStringOption.find(evt['id'], 'alias');
-    if (rxAlias.value != evt['alias']) {
-      rxAlias.value = evt['alias'];
-    }
   }
 
   _updateCurDisplay(SessionID sessionId, Display newDisplay) {
@@ -1663,6 +1659,7 @@ class ElevationModel with ChangeNotifier {
   bool get showRequestMenu => _canElevate && !_running;
   onPeerInfo(PeerInfo pi) {
     _canElevate = pi.platform == kPeerPlatformWindows && pi.sasEnabled == false;
+    _running = false;
   }
 
   onPortableServiceRunning(Map<String, dynamic> evt) {
@@ -1699,6 +1696,7 @@ class FFI {
   late final RecordingModel recordingModel; // session
   late final InputModel inputModel; // session
   late final ElevationModel elevationModel; // session
+  late final CmFileModel cmFileModel; // cm
 
   FFI(SessionID? sId) {
     sessionId = sId ?? (isDesktop ? Uuid().v4obj() : _constSessionId);
@@ -1717,6 +1715,7 @@ class FFI {
     recordingModel = RecordingModel(WeakReference(this));
     inputModel = InputModel(WeakReference(this));
     elevationModel = ElevationModel(WeakReference(this));
+    cmFileModel = CmFileModel(WeakReference(this));
   }
 
   /// Mobile reuse FFI
@@ -1790,7 +1789,7 @@ class FFI {
             debugPrint('Unreachable, the cached data cannot be decoded.');
             return;
           }
-          ffiModel.handleCachedPeerData(data, id);
+          await ffiModel.handleCachedPeerData(data, id);
           await bind.sessionRefresh(sessionId: sessionId);
         });
         isToNewWindowNotified.value = true;

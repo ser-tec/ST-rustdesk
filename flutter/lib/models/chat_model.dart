@@ -10,7 +10,6 @@ import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/mobile/pages/home_page.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
-import 'package:get/get_rx/src/rx_types/rx_types.dart';
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
 import 'package:window_manager/window_manager.dart';
@@ -74,7 +73,7 @@ class ChatModel with ChangeNotifier {
 
   Offset chatWindowPosition = Offset(20, 80);
 
-   void setChatWindowPosition(Offset position) {
+  void setChatWindowPosition(Offset position) {
     chatWindowPosition = position;
     notifyListeners();
   }
@@ -93,13 +92,13 @@ class ChatModel with ChangeNotifier {
   late final Map<MessageKey, MessageBody> _messages = {};
 
   MessageKey _currentKey = MessageKey('', -2); // -2 is invalid value
-  late bool _isShowCMChatPage = false;
+  late bool _isShowCMSidePage = false;
 
   Map<MessageKey, MessageBody> get messages => _messages;
 
   MessageKey get currentKey => _currentKey;
 
-  bool get isShowCMChatPage => _isShowCMChatPage;
+  bool get isShowCMSidePage => _isShowCMSidePage;
 
   void setOverlayState(BlockableOverlayState blockableOverlayState) {
     _blockableOverlayState = blockableOverlayState;
@@ -262,7 +261,7 @@ class ChatModel with ChangeNotifier {
   showChatPage(MessageKey key) async {
     if (isDesktop) {
       if (isConnManager) {
-        if (!_isShowCMChatPage) {
+        if (!_isShowCMSidePage) {
           await toggleCMChatPage(key);
         }
       } else {
@@ -283,8 +282,15 @@ class ChatModel with ChangeNotifier {
     if (gFFI.chatModel.currentKey != key) {
       gFFI.chatModel.changeCurrentKey(key);
     }
-    if (_isShowCMChatPage) {
-      _isShowCMChatPage = !_isShowCMChatPage;
+    await toggleCMSidePage();
+  }
+
+  var _togglingCMSidePage = false; // protect order for await
+  toggleCMSidePage() async {
+    if (_togglingCMSidePage) return false;
+    _togglingCMSidePage = true;
+    if (_isShowCMSidePage) {
+      _isShowCMSidePage = !_isShowCMSidePage;
       notifyListeners();
       await windowManager.show();
       await windowManager.setSizeAlignment(
@@ -294,9 +300,10 @@ class ChatModel with ChangeNotifier {
       await windowManager.show();
       await windowManager.setSizeAlignment(
           kConnectionManagerWindowSizeOpenChat, Alignment.topRight);
-      _isShowCMChatPage = !_isShowCMChatPage;
+      _isShowCMSidePage = !_isShowCMSidePage;
       notifyListeners();
     }
+    _togglingCMSidePage = false;
   }
 
   changeCurrentKey(MessageKey key) {
